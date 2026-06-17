@@ -28,6 +28,7 @@ jobs:
         run: echo "name=${{ inputs.skill || 'external-feature' }}" >> "$GITHUB_OUTPUT"
 
       
+      
       # >>> charon aeon preflight
       - name: Charon preflight
         id: charon_preflight
@@ -52,7 +53,9 @@ jobs:
         id: charon_review
         run: |
           npx -y github:CharonAI-code/charon aeon review export latest --github-output "$GITHUB_OUTPUT" || true
-          for file in .charon/aeon/exports/*.md; do [ -f "$file" ] && cat "$file" >> "$GITHUB_STEP_SUMMARY"; done
+          for file in .charon/aeon/exports/*.md; do
+            if [ -f "$file" ]; then cat "$file" >> "$GITHUB_STEP_SUMMARY"; fi
+          done
       # <<< charon aeon preflight
 
       - name: Run pre-fetch scripts
