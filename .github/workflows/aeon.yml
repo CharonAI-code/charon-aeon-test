@@ -27,6 +27,34 @@ jobs:
       - id: skill
         run: echo "name=${{ inputs.skill || 'external-feature' }}" >> "$GITHUB_OUTPUT"
 
+      
+      # >>> charon aeon preflight
+      - name: Charon preflight
+        id: charon_preflight
+        if: steps.work.outputs.mode != ''
+        env:
+          SKILL: ${{ steps.skill.outputs.name }}
+          SKILL_VAR: ${{ inputs.var }}
+          AEON_ACTOR: ${{ github.actor }}
+          AEON_TRIGGER: ${{ github.event_name == 'repository_dispatch' && github.event.action || github.event_name }}
+        run: |
+          npx -y github:CharonAI-code/charon aeon preflight \
+            --skill "$SKILL" \
+            --var "$SKILL_VAR" \
+            --trigger "$AEON_TRIGGER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --run-id "$GITHUB_RUN_ID" \
+            --actor "$AEON_ACTOR" \
+            --policy charon.aeon.yml \
+            --review
+      - name: Charon review export
+        if: always()
+        id: charon_review
+        run: |
+          npx -y github:CharonAI-code/charon aeon review export latest --github-output "$GITHUB_OUTPUT" || true
+          for file in .charon/aeon/exports/*.md; do [ -f "$file" ] && cat "$file" >> "$GITHUB_STEP_SUMMARY"; done
+      # <<< charon aeon preflight
+
       - name: Run pre-fetch scripts
         run: echo "prefetch"
 
