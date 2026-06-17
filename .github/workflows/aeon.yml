@@ -1,0 +1,36 @@
+name: Aeon
+
+on:
+  workflow_dispatch:
+    inputs:
+      skill:
+        description: Skill name
+        required: false
+        default: external-feature
+      var:
+        description: Skill var
+        required: false
+        default: ""
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: work
+        run: echo "mode=skill" >> "$GITHUB_OUTPUT"
+
+      - id: skill
+        run: echo "name=${{ inputs.skill || 'external-feature' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Run pre-fetch scripts
+        run: echo "prefetch"
+
+      - name: Run
+        run: |
+          ALLOWED="Bash(git:*),Write,Edit"
+          claude -p "run aeon skill" --allowedTools "$ALLOWED"

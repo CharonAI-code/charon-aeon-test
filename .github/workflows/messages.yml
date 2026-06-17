@@ -1,0 +1,11 @@
+name: Messages
+
+on:
+  repository_dispatch:
+    types: [telegram-message]
+
+jobs:
+  message:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "telegram message received"

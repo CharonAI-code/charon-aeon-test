@@ -1,0 +1,8 @@
+skills:
+  digest:
+    enabled: true
+    schedule: "0 7 * * *"
+  external-feature:
+    enabled: true
+    schedule: "workflow_dispatch"
+    var: ""
