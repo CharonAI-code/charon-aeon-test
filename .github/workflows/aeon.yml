@@ -59,6 +59,7 @@ jobs:
         run: echo "prefetch"
 
       - name: Run
+        env:
         run: |
           ALLOWED="Bash(git:*),Write,Edit"
           claude -p "run aeon skill" --allowedTools "$ALLOWED"
