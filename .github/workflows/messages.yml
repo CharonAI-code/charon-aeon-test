@@ -49,6 +49,12 @@ jobs:
 
           echo "source=$source" >> "$GITHUB_OUTPUT"
           echo "actor=$actor" >> "$GITHUB_OUTPUT"
+          skill="digest"
+          lower="$(printf '%s' "$message" | tr '[:upper:]' '[:lower:]')"
+          if printf '%s' "$lower" | grep -Eq '\b(ship|edit|write|commit|change|modify|fix|implement|create file|delete file)\b'; then
+            skill="external-feature"
+          fi
+          echo "skill=$skill" >> "$GITHUB_OUTPUT"
           echo "message<<EOF" >> "$GITHUB_OUTPUT"
           echo "$message" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -61,10 +67,11 @@ jobs:
           MESSAGE: ${{ steps.msg.outputs.message }}
           SOURCE: ${{ steps.msg.outputs.source }}
           ACTOR: ${{ steps.msg.outputs.actor }}
+          SKILL: ${{ steps.msg.outputs.skill }}
         run: |
           set +e
           npx -y github:CharonAI-code/charon aeon preflight \
-            --skill digest \
+            --skill "$SKILL" \
             --var "$MESSAGE" \
             --trigger "$SOURCE-message" \
             --repo "$GITHUB_REPOSITORY" \
