@@ -69,12 +69,7 @@ jobs:
           fi
           review_id="$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log(j.reviewId || "")' "$export_file")"
           reason="$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log(j.reason || "")' "$export_file")"
-          text="Charon paused Aeon skill: external-feature
-Review: ${review_id}
-Reason: ${reason}
-Repo: ${GITHUB_REPOSITORY}
-Run: ${GITHUB_RUN_ID}
-Approve/reject from Charon review queue."
+          text="$(printf 'Charon paused Aeon skill: external-feature\nReview: %s\nReason: %s\nRepo: %s\nRun: %s\nApprove/reject from Charon review queue.' "$review_id" "$reason" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
           curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d "chat_id=${TELEGRAM_CHAT_ID}" \
             --data-urlencode "text=${text}" \
