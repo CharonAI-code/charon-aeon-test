@@ -1,6 +1,6 @@
 name: Aeon
 
-on:
+"on":
   workflow_dispatch:
     inputs:
       skill:
