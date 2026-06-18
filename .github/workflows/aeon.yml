@@ -61,16 +61,25 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          CHARON_TELEGRAM_TEXT: ${{ steps.charon_review.outputs.charon_telegram_text }}
         run: |
-          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ] || [ -z "$CHARON_TELEGRAM_TEXT" ]; then
+          export_file="$(find .charon/aeon/exports -name '*.json' -type f 2>/dev/null | sort | tail -1)"
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ] || [ -z "$export_file" ]; then
             echo "No Charon Telegram review to send."
             exit 0
           fi
+          review_id="$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log(j.reviewId || "")' "$export_file")"
+          reason="$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log(j.reason || "")' "$export_file")"
+          text="Charon paused Aeon skill: external-feature
+Review: ${review_id}
+Reason: ${reason}
+Repo: ${GITHUB_REPOSITORY}
+Run: ${GITHUB_RUN_ID}
+Approve/reject from Charon review queue."
           curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d "chat_id=${TELEGRAM_CHAT_ID}" \
-            --data-urlencode "text=${CHARON_TELEGRAM_TEXT}" \
-            -d "disable_web_page_preview=true"
+            --data-urlencode "text=${text}" \
+            -d "disable_web_page_preview=true" >/dev/null
+          echo "Sent Charon review to Telegram."
       # <<< charon aeon preflight
 
       - name: Run pre-fetch scripts
