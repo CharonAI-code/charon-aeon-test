@@ -5,6 +5,10 @@ bounds:
   pause: []
   deny: []
   rules:
+    - id: aeon.intent_delete.deny
+      verdict: DENY
+      role: delete-path
+      includes: "."
     - id: aeon.workflow_write.pause
       verdict: PAUSE
       role: write-path
