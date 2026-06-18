@@ -1,11 +1,169 @@
 name: Messages
+run-name: "${{ inputs.message && format('msg ({0}): {1}', inputs.source || 'user', inputs.message) || (github.event_name == 'repository_dispatch' && format('msg ({0}): {1}', github.event.action, github.event.client_payload.message)) || 'message' }}"
 
 on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: Message to process
+        required: true
+        type: string
+      source:
+        description: Message source
+        required: false
+        default: telegram
+        type: string
   repository_dispatch:
     types: [telegram-message]
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
-  message:
+  run:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - run: echo "telegram message received"
+      - name: Extract message
+        id: msg
+        env:
+          INPUT_MESSAGE: ${{ inputs.message }}
+          INPUT_SOURCE: ${{ inputs.source }}
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            message="$(jq -r '.' <<'JSON'
+          ${{ toJson(github.event.client_payload.message) }}
+          JSON
+          )"
+            source="telegram"
+            actor="$(jq -r '.chat_id // .from // "telegram"' <<'JSON'
+          ${{ toJson(github.event.client_payload) }}
+          JSON
+          )"
+          else
+            message="$INPUT_MESSAGE"
+            source="${INPUT_SOURCE:-telegram}"
+            actor="${{ github.actor }}"
+          fi
+
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+          echo "actor=$actor" >> "$GITHUB_OUTPUT"
+          echo "message<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$message" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+
+      - name: Charon message preflight
+        id: charon
+        env:
+          MESSAGE: ${{ steps.msg.outputs.message }}
+          SOURCE: ${{ steps.msg.outputs.source }}
+          ACTOR: ${{ steps.msg.outputs.actor }}
+        run: |
+          set +e
+          npx -y github:CharonAI-code/charon aeon preflight \
+            --skill digest \
+            --var "$MESSAGE" \
+            --trigger "$SOURCE-message" \
+            --repo "$GITHUB_REPOSITORY" \
+            --run-id "$GITHUB_RUN_ID" \
+            --actor "$ACTOR" \
+            --policy charon.aeon.yml \
+            --review > charon-preflight.json
+          status=$?
+          set -e
+
+          verdict="$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("charon-preflight.json","utf8")); console.log(j.verdict || "")')"
+          reason="$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("charon-preflight.json","utf8")); console.log(j.reason || "")')"
+          rule_id="$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("charon-preflight.json","utf8")); console.log(j.ruleId || "")')"
+          review_id="$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync("charon-preflight.json","utf8")); console.log(j.reviewId || "")')"
+
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+          echo "rule_id=$rule_id" >> "$GITHUB_OUTPUT"
+          echo "review_id=$review_id" >> "$GITHUB_OUTPUT"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Charon preflight"
+            echo ""
+            echo "- verdict: \`$verdict\`"
+            echo "- rule: \`$rule_id\`"
+            echo "- launched: \`false\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          cat charon-preflight.json | jq '{verdict, reason, ruleId, launched, reviewId}'
+
+      - name: Export Charon review
+        if: always() && steps.charon.outputs.verdict == 'PAUSE'
+        id: charon_review
+        run: |
+          npx -y github:CharonAI-code/charon aeon review export latest --github-output "$GITHUB_OUTPUT" || true
+          for file in .charon/aeon/exports/*.md; do
+            if [ -f "$file" ]; then cat "$file" >> "$GITHUB_STEP_SUMMARY"; fi
+          done
+
+      - name: Notify Telegram blocked
+        if: always() && (steps.charon.outputs.verdict == 'PAUSE' || steps.charon.outputs.verdict == 'DENY')
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VERDICT: ${{ steps.charon.outputs.verdict }}
+          REASON: ${{ steps.charon.outputs.reason }}
+          RULE_ID: ${{ steps.charon.outputs.rule_id }}
+          REVIEW_ID: ${{ steps.charon.outputs.review_id }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram not configured."
+            exit 0
+          fi
+          if [ "$VERDICT" = "PAUSE" ]; then
+            text="$(printf 'Charon paused AEON message before launch.\nReview: %s\nRule: %s\nReason: %s\nRun: %s\nApproval flow is next.' "$REVIEW_ID" "$RULE_ID" "$REASON" "$GITHUB_RUN_ID")"
+          else
+            text="$(printf 'Charon denied AEON message before launch.\nRule: %s\nReason: %s\nRun: %s' "$RULE_ID" "$REASON" "$GITHUB_RUN_ID")"
+          fi
+          curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${text}" \
+            -d "disable_web_page_preview=true" >/dev/null
+          echo "Sent Charon $VERDICT notification to Telegram."
+
+      - name: Stop on Charon PAUSE or DENY
+        if: steps.charon.outputs.verdict == 'PAUSE' || steps.charon.outputs.verdict == 'DENY'
+        env:
+          STATUS: ${{ steps.charon.outputs.status }}
+        run: exit "$STATUS"
+
+      - name: Run AEON message
+        if: steps.charon.outputs.verdict == 'PASS'
+        env:
+          MESSAGE: ${{ steps.msg.outputs.message }}
+          SOURCE: ${{ steps.msg.outputs.source }}
+          BANKR_LLM_KEY: ${{ secrets.BANKR_LLM_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_BASE_URL: https://llm.bankr.bot
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.BANKR_LLM_KEY }}
+        run: |
+          if ! command -v claude >/dev/null 2>&1; then
+            npm install -g @anthropic-ai/claude-code >/dev/null
+          fi
+
+          cat > ./notify <<'NOTIFY'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          msg="$1"
+          if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
+            curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d "chat_id=${TELEGRAM_CHAT_ID}" \
+              --data-urlencode "text=${msg}" \
+              -d "disable_web_page_preview=true" >/dev/null || true
+          fi
+          NOTIFY
+          chmod +x ./notify
+
+          prompt="$(printf 'You received this AEON message from %s:\n\n%s\n\nReply through ./notify. Keep it short for this test repo.' "$SOURCE" "$MESSAGE")"
+          ALLOWED="Read,Glob,Grep,Bash(./notify:*)"
+          echo "$prompt" | claude -p - --allowedTools "$ALLOWED"
