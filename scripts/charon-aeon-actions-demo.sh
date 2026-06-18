@@ -2,7 +2,7 @@
 set -u
 
 REPO="${REPO:-CharonAI-code/charon-aeon-test}"
-WORKFLOW="${WORKFLOW:-Aeon}"
+WORKFLOW="${WORKFLOW:-Charon Aeon Demo}"
 
 require_gh() {
   command -v gh >/dev/null 2>&1 || {

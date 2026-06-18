@@ -1,0 +1,98 @@
+name: Charon Aeon Demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      skill:
+        description: Skill name
+        required: false
+        default: external-feature
+      var:
+        description: Skill var
+        required: false
+        default: ""
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: work
+        run: echo "mode=skill" >> "$GITHUB_OUTPUT"
+
+      - id: skill
+        run: echo "name=${{ inputs.skill || 'external-feature' }}" >> "$GITHUB_OUTPUT"
+
+      
+      
+      # >>> charon aeon preflight
+      - name: Charon preflight
+        id: charon_preflight
+        if: steps.work.outputs.mode != ''
+        env:
+          SKILL: ${{ steps.skill.outputs.name }}
+          SKILL_VAR: ${{ inputs.var }}
+          AEON_ACTOR: ${{ github.actor }}
+          AEON_TRIGGER: ${{ github.event_name == 'repository_dispatch' && github.event.action || github.event_name }}
+        run: |
+          npx -y github:CharonAI-code/charon aeon preflight \
+            --skill "$SKILL" \
+            --var "$SKILL_VAR" \
+            --trigger "$AEON_TRIGGER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --run-id "$GITHUB_RUN_ID" \
+            --actor "$AEON_ACTOR" \
+            --policy charon.aeon.yml \
+            --review
+      - name: Charon review export
+        if: always()
+        id: charon_review
+        run: |
+          npx -y github:CharonAI-code/charon aeon review export latest --github-output "$GITHUB_OUTPUT" || true
+          for file in .charon/aeon/exports/*.md; do
+            if [ -f "$file" ]; then cat "$file" >> "$GITHUB_STEP_SUMMARY"; fi
+          done
+      - name: Send Charon review to Telegram
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          export_file="$(find .charon/aeon/exports -name '*.json' -type f 2>/dev/null | sort | tail -1)"
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ] || [ -z "$export_file" ]; then
+            echo "No Charon Telegram review to send."
+            exit 0
+          fi
+          review_id="$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log(j.reviewId || "")' "$export_file")"
+          reason="$(node -e 'const fs=require("fs"); const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log(j.reason || "")' "$export_file")"
+          text="Charon paused Aeon skill: external-feature
+Review: ${review_id}
+Reason: ${reason}
+Repo: ${GITHUB_REPOSITORY}
+Run: ${GITHUB_RUN_ID}
+Approve/reject from Charon review queue."
+          curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${text}" \
+            -d "disable_web_page_preview=true" >/dev/null
+          echo "Sent Charon review to Telegram."
+      # <<< charon aeon preflight
+
+      - name: Run pre-fetch scripts
+        run: echo "prefetch"
+
+      - name: Run
+        env:
+          BANKR_LLM_KEY: ${{ secrets.BANKR_LLM_KEY }}
+          ANTHROPIC_BASE_URL: https://llm.bankr.bot
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.BANKR_LLM_KEY }}
+        run: |
+          if ! command -v claude >/dev/null 2>&1; then
+            npm install -g @anthropic-ai/claude-code >/dev/null
+          fi
+          ALLOWED="Bash(git:*),Write,Edit"
+          claude -p "run aeon skill" --allowedTools "$ALLOWED"
