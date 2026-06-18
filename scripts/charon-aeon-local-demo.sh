@@ -6,8 +6,6 @@ run_charon() {
     "$CHARON_BIN" "$@"
   elif command -v charon >/dev/null 2>&1; then
     charon "$@"
-  elif [ -f "/Users/keyur/finch-cli/charon/bin/charon.js" ]; then
-    node "/Users/keyur/finch-cli/charon/bin/charon.js" "$@"
   else
     npx -y github:CharonAI-code/charon "$@"
   fi
