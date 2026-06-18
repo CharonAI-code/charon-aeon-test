@@ -2,11 +2,13 @@ name: Messages
 run-name: "${{ inputs.message && format('msg ({0}): {1}', inputs.source || 'user', inputs.message) || (github.event_name == 'repository_dispatch' && format('msg ({0}): {1}', github.event.action, github.event.client_payload.message)) || 'message' }}"
 
 on:
+  schedule:
+    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       message:
         description: Message to process
-        required: true
+        required: false
         type: string
       source:
         description: Message source
@@ -21,7 +23,60 @@ permissions:
   actions: write
 
 jobs:
+  poll:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.message == '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Poll Telegram and dispatch messages
+        env:
+          GH_TOKEN: ${{ secrets.GH_GLOBAL || secrets.GITHUB_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "Telegram polling not configured."
+            exit 0
+          fi
+
+          webhook_url="$(curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo" | jq -r '.result.url // empty')"
+          if [ -n "$webhook_url" ]; then
+            echo "Telegram webhook active; polling skipped."
+            exit 0
+          fi
+
+          response="$(curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?timeout=0&allowed_updates=%5B%22message%22%5D")"
+          count="$(echo "$response" | jq '.result | length')"
+          max_update_id=""
+          messages='[]'
+
+          for ((i=0; i<count; i++)); do
+            text="$(echo "$response" | jq -r ".result[$i].message.text // empty")"
+            chat="$(echo "$response" | jq -r ".result[$i].message.chat.id // empty")"
+            update_id="$(echo "$response" | jq -r ".result[$i].update_id // empty")"
+            if [ -n "$update_id" ]; then max_update_id="$update_id"; fi
+            if [ -n "$text" ] && [ "$chat" = "$TELEGRAM_CHAT_ID" ]; then
+              messages="$(echo "$messages" | jq --arg text "$text" '. + [$text]')"
+            fi
+          done
+
+          if [ -n "$max_update_id" ]; then
+            ack_ok="$(curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=$((max_update_id + 1))" | jq -r '.ok // false')"
+            if [ "$ack_ok" != "true" ]; then
+              echo "::warning::Telegram offset ack failed; not dispatching messages."
+              exit 0
+            fi
+          fi
+
+          msg_count="$(echo "$messages" | jq 'length')"
+          echo "Found $msg_count Telegram message(s)."
+          for ((i=0; i<msg_count; i++)); do
+            text="$(echo "$messages" | jq -r ".[$i]")"
+            gh workflow run Messages -R "$GITHUB_REPOSITORY" -f source=telegram -f message="$text"
+          done
+
   run:
+    if: github.event_name == 'repository_dispatch' || (github.event_name == 'workflow_dispatch' && inputs.message != '')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
