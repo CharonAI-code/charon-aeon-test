@@ -2,7 +2,31 @@ skills:
   digest:
     enabled: true
     schedule: "0 7 * * *"
+    var: "ai agents"
+  repo-pulse:
+    enabled: true
+    schedule: "workflow_dispatch"
+    var: "CharonAI-code/charon"
+  github-monitor:
+    enabled: true
+    schedule: "workflow_dispatch"
+    var: "CharonAI-code/charon"
+  security-digest:
+    enabled: true
+    schedule: "workflow_dispatch"
+    var: "agent runtimes, MCP, GitHub Actions"
   external-feature:
     enabled: true
     schedule: "workflow_dispatch"
-    var: ""
+    var: "CharonAI-code/charon"
+  deploy-prototype:
+    enabled: true
+    schedule: "workflow_dispatch"
+    var: "repo-health-mini"
+  workflow-audit:
+    enabled: true
+    schedule: "workflow_dispatch"
+  pr-review:
+    enabled: true
+    schedule: "workflow_dispatch"
+    var: "CharonAI-code/charon"

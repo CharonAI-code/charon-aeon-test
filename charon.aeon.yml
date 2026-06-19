@@ -17,6 +17,10 @@ bounds:
       verdict: PAUSE
       role: mcp-tool
       includes: aeon.skill:external-feature
+    - id: aeon.pr_review.pause
+      verdict: PAUSE
+      role: mcp-tool
+      includes: aeon.skill:pr-review
     - id: aeon.auto_merge.pause
       verdict: PAUSE
       role: mcp-tool
