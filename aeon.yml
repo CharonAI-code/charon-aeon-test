@@ -1,4 +1,6 @@
 model: deepseek-v4-pro
+gateway:
+  provider: auto
 
 skills:
   digest:

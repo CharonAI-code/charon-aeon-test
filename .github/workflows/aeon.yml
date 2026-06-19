@@ -93,31 +93,56 @@ jobs:
       - name: Run
         id: aeon_run
         env:
-          BANKR_API_KEY: ${{ secrets.BANKR_API_KEY || secrets.BANKR_LLM_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL }}
           BANKR_LLM_KEY: ${{ secrets.BANKR_LLM_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          USEPOD_TOKEN: ${{ secrets.USEPOD_TOKEN }}
+          VENICE_API_KEY: ${{ secrets.VENICE_API_KEY }}
+          SURPLUS_API_KEY: ${{ secrets.SURPLUS_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+          OPENROUTER_MODEL_SONNET: ${{ vars.OPENROUTER_MODEL_SONNET }}
+          OPENROUTER_MODEL_HAIKU: ${{ vars.OPENROUTER_MODEL_HAIKU }}
+          USEPOD_MODEL: ${{ vars.USEPOD_MODEL }}
+          USEPOD_MODEL_SONNET: ${{ vars.USEPOD_MODEL_SONNET }}
+          USEPOD_MODEL_HAIKU: ${{ vars.USEPOD_MODEL_HAIKU }}
+          VENICE_MODEL: ${{ vars.VENICE_MODEL }}
+          VENICE_BASE_URL: ${{ vars.VENICE_BASE_URL }}
+          VENICE_CLEANCACHE: ${{ vars.VENICE_CLEANCACHE }}
+          SURPLUS_MODEL: ${{ vars.SURPLUS_MODEL }}
+          CCR_LOG: ${{ vars.CCR_LOG }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          ANTHROPIC_BASE_URL: https://llm.bankr.bot
-          ANTHROPIC_AUTH_TOKEN: ${{ secrets.BANKR_API_KEY || secrets.BANKR_LLM_KEY }}
-          ANTHROPIC_MODEL: deepseek-v4-pro
-          CLAUDE_CODE_MODEL: deepseek-v4-pro
           INPUT_MODEL: ${{ inputs.model }}
           SKILL_NAME: ${{ steps.skill.outputs.name }}
           SKILL_VAR: ${{ inputs.var }}
         run: |
           if ! command -v claude >/dev/null 2>&1; then
-            npm install -g @anthropic-ai/claude-code >/dev/null
+            npm install -g @anthropic-ai/claude-code@2.1.168 >/dev/null
           fi
           CONFIG_MODEL="$(grep -E '^model:' aeon.yml | sed 's/^model: *//' | tr -d ' \"')"
           SKILL_MODEL="$(grep "^  ${SKILL_NAME}:" aeon.yml | sed -n 's/.*model: *\"\([^\"]*\)\".*/\1/p')"
-          if [ -n "$INPUT_MODEL" ]; then
+          if [ -n "$INPUT_MODEL" ] && [ "$INPUT_MODEL" != "(config default)" ]; then
             MODEL="$INPUT_MODEL"
           elif [ -n "$SKILL_MODEL" ]; then
             MODEL="$SKILL_MODEL"
           else
-            MODEL="${CONFIG_MODEL:-deepseek-v4-pro}"
+            MODEL="${CONFIG_MODEL:-claude-opus-4-8}"
           fi
           echo "Using model: $MODEL"
+          echo "SKILL_MODEL=$MODEL" >> "$GITHUB_OUTPUT"
+
+          BASE_MODEL="$MODEL"
+          GW="${GITHUB_WORKSPACE}/scripts/llm-gateway.sh"
+          GATEWAY=$(grep -A1 '^gateway:' aeon.yml | grep 'provider:' | sed 's/.*provider:[[:space:]]*//' | sed "s/[\"' ]//g" || true)
+          GATEWAY="${GATEWAY:-auto}"
+          if [ "$GATEWAY" = "auto" ]; then
+            CANDIDATES=$(AEON_LIST_CANDIDATES=1 bash "$GW")
+          else
+            CANDIDATES="$GATEWAY"
+          fi
+          echo "Gateway: $GATEWAY  |  cascade order: $CANDIDATES"
 
           cat > ./notify <<'NOTIFY'
           #!/usr/bin/env bash
@@ -135,15 +160,30 @@ jobs:
 
           ALLOWED="Bash(git:*),Bash(./notify:*),Write,Edit"
           prompt="$(printf 'Run AEON skill: %s\n\nTask:\n%s\n\nWhen finished, send the user a concise result through ./notify. Include what changed or what happened. Do not only say complete.' "$SKILL_NAME" "$SKILL_VAR")"
-          set +e
-          CLAUDE_OUTPUT="$(claude -p "$prompt" --model "$MODEL" --allowedTools "$ALLOWED" 2>&1)"
-          code=$?
-          set -e
-          printf '%s\n' "$CLAUDE_OUTPUT"
-          if [ "$code" != "0" ]; then
-            exit "$code"
+          CLAUDE_OK=0
+          USED_GATEWAY=""
+          for cand in $CANDIDATES; do
+            echo "::notice::Routing attempt via '$cand'"
+            if CLAUDE_OUTPUT=$(
+              GATEWAY="$cand"
+              MODEL="$BASE_MODEL"
+              source "$GW" >&2
+              echo "$prompt" | claude -p - --model "$MODEL" --allowedTools "$ALLOWED" --output-format json 2>&1
+            ); then
+              USED_GATEWAY="$cand"
+              CLAUDE_OK=1
+              break
+            fi
+            echo "::warning::provider '$cand' failed - $(printf '%s' "$CLAUDE_OUTPUT" | tail -c 160 | tr '\n' ' ')"
+          done
+          if [ "$CLAUDE_OK" != "1" ]; then
+            echo "::error::All gateway providers failed ($CANDIDATES). Last output: $CLAUDE_OUTPUT"
+            exit 1
           fi
+          echo "GATEWAY=$USED_GATEWAY" >> "$GITHUB_OUTPUT"
+          RESULT_TEXT="$(echo "$CLAUDE_OUTPUT" | jq -r '.result // empty')"
+          printf '%s\n' "$RESULT_TEXT"
           if [ ! -f .aeon-notified ]; then
-            summary="$(printf '%s' "$CLAUDE_OUTPUT" | tail -c 3000)"
+            summary="$(printf '%s' "$RESULT_TEXT" | tail -c 3000)"
             ./notify "$(printf 'AEON result\n\n%s' "$summary")" || true
           fi

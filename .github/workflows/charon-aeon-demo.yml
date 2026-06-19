@@ -82,18 +82,35 @@ jobs:
 
       - name: Run
         env:
-          BANKR_API_KEY: ${{ secrets.BANKR_API_KEY || secrets.BANKR_LLM_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL }}
           BANKR_LLM_KEY: ${{ secrets.BANKR_LLM_KEY }}
-          ANTHROPIC_BASE_URL: https://llm.bankr.bot
-          ANTHROPIC_AUTH_TOKEN: ${{ secrets.BANKR_API_KEY || secrets.BANKR_LLM_KEY }}
-          ANTHROPIC_MODEL: deepseek-v4-pro
-          CLAUDE_CODE_MODEL: deepseek-v4-pro
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          USEPOD_TOKEN: ${{ secrets.USEPOD_TOKEN }}
+          VENICE_API_KEY: ${{ secrets.VENICE_API_KEY }}
+          SURPLUS_API_KEY: ${{ secrets.SURPLUS_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+          OPENROUTER_MODEL_SONNET: ${{ vars.OPENROUTER_MODEL_SONNET }}
+          OPENROUTER_MODEL_HAIKU: ${{ vars.OPENROUTER_MODEL_HAIKU }}
+          USEPOD_MODEL: ${{ vars.USEPOD_MODEL }}
+          USEPOD_MODEL_SONNET: ${{ vars.USEPOD_MODEL_SONNET }}
+          USEPOD_MODEL_HAIKU: ${{ vars.USEPOD_MODEL_HAIKU }}
+          VENICE_MODEL: ${{ vars.VENICE_MODEL }}
+          VENICE_BASE_URL: ${{ vars.VENICE_BASE_URL }}
+          VENICE_CLEANCACHE: ${{ vars.VENICE_CLEANCACHE }}
+          SURPLUS_MODEL: ${{ vars.SURPLUS_MODEL }}
+          CCR_LOG: ${{ vars.CCR_LOG }}
         run: |
           if ! command -v claude >/dev/null 2>&1; then
-            npm install -g @anthropic-ai/claude-code >/dev/null
+            npm install -g @anthropic-ai/claude-code@2.1.168 >/dev/null
           fi
           MODEL="$(grep -E '^model:' aeon.yml | sed 's/^model: *//' | tr -d ' \"')"
-          MODEL="${MODEL:-deepseek-v4-pro}"
+          MODEL="${MODEL:-claude-opus-4-8}"
           echo "Using model: $MODEL"
+          GW="${GITHUB_WORKSPACE}/scripts/llm-gateway.sh"
+          GATEWAY=$(grep -A1 '^gateway:' aeon.yml | grep 'provider:' | sed 's/.*provider:[[:space:]]*//' | sed "s/[\"' ]//g" || true)
+          GATEWAY="${GATEWAY:-auto}"
+          source "$GW"
           ALLOWED="Bash(git:*),Write,Edit"
           claude -p "run aeon skill" --model "$MODEL" --allowedTools "$ALLOWED"
