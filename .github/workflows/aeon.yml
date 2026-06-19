@@ -11,6 +11,10 @@ name: Aeon
         description: Skill var
         required: false
         default: ""
+      charon_approval:
+        description: Charon approval id
+        required: false
+        default: ""
 
 jobs:
   run:
@@ -27,13 +31,23 @@ jobs:
       - id: skill
         run: echo "name=${{ inputs.skill || 'external-feature' }}" >> "$GITHUB_OUTPUT"
 
+      - name: Charon approval
+        if: inputs.charon_approval != ''
+        run: |
+          {
+            echo "### Charon approval"
+            echo ""
+            echo "- review: \`${{ inputs.charon_approval }}\`"
+            echo "- preflight: \`approved by Telegram callback\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       
       
       
       # >>> charon aeon preflight
       - name: Charon preflight
         id: charon_preflight
-        if: steps.work.outputs.mode != ''
+        if: steps.work.outputs.mode != '' && inputs.charon_approval == ''
         env:
           SKILL: ${{ steps.skill.outputs.name }}
           SKILL_VAR: ${{ inputs.var }}

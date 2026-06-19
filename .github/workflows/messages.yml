@@ -85,16 +85,21 @@ jobs:
             callback_id="$(echo "$callbacks" | jq -r ".[$i].id")"
             callback_data="$(echo "$callbacks" | jq -r ".[$i].data")"
             actor="$(echo "$callbacks" | jq -r ".[$i].actor")"
+            decision="$(printf '%s' "$callback_data" | cut -d: -f2)"
+            review_id="$(printf '%s' "$callback_data" | cut -d: -f3)"
 
-            if npx -y github:CharonAI-code/charon aeon telegram decide \
-              --callback "$callback_data" \
-              --actor "$actor" \
-              --rerun \
-              --repo "$GITHUB_REPOSITORY" \
-              --workflow aeon.yml; then
-              answer="Charon decision recorded."
+            if [ "$decision" = "approve" ] && [ -n "$review_id" ]; then
+              gh workflow run aeon.yml -R "$GITHUB_REPOSITORY" \
+                -f skill=external-feature \
+                -f var="" \
+                -f charon_approval="$review_id"
+              answer="Charon approved. AEON run dispatched."
+            elif [ "$decision" = "reject" ] && [ -n "$review_id" ]; then
+              answer="Charon rejected. No run dispatched."
+            elif [ "$decision" = "inspect" ] && [ -n "$review_id" ]; then
+              answer="Review: $review_id"
             else
-              answer="Charon decision failed."
+              answer="Unknown Charon action."
             fi
             curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery" \
               -d "callback_query_id=${callback_id}" \
