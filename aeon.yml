@@ -9,15 +9,53 @@ skills:
     enabled: true
     schedule: "workflow_dispatch"
     var: "CharonAI-code/charon"
+  code-health:
+    enabled: true
+    schedule: "workflow_dispatch"
+    var: "CharonAI-code/charon"
+  repo-scanner:
+    enabled: true
+    schedule: "workflow_dispatch"
+    var: "CharonAI-code/charon"
   github-monitor:
     enabled: true
     schedule: "workflow_dispatch"
     var: "CharonAI-code/charon"
+  github-trending:
+    enabled: true
+    schedule: "workflow_dispatch"
+  hn-digest:
+    enabled: true
+    schedule: "workflow_dispatch"
+  mcp-pulse:
+    enabled: true
+    schedule: "workflow_dispatch"
+  framework-watch:
+    enabled: true
+    schedule: "workflow_dispatch"
   security-digest:
     enabled: true
     schedule: "workflow_dispatch"
     var: "agent runtimes, MCP, GitHub Actions"
+  priority-brief:
+    enabled: true
+    schedule: "workflow_dispatch"
+  changelog:
+    enabled: true
+    schedule: "workflow_dispatch"
+    var: "CharonAI-code/charon"
+  cost-report:
+    enabled: true
+    schedule: "workflow_dispatch"
   external-feature:
+    enabled: true
+    schedule: "workflow_dispatch"
+    var: "CharonAI-code/charon"
+  repo-actions:
+    enabled: true
+    schedule: "workflow_dispatch"
+    var: "CharonAI-code/charon"
+  issue-triage:
     enabled: true
     schedule: "workflow_dispatch"
     var: "CharonAI-code/charon"

@@ -21,6 +21,14 @@ bounds:
       verdict: PAUSE
       role: mcp-tool
       includes: aeon.skill:pr-review
+    - id: aeon.repo_actions.pause
+      verdict: PAUSE
+      role: mcp-tool
+      includes: aeon.skill:repo-actions
+    - id: aeon.issue_triage.pause
+      verdict: PAUSE
+      role: mcp-tool
+      includes: aeon.skill:issue-triage
     - id: aeon.auto_merge.pause
       verdict: PAUSE
       role: mcp-tool

@@ -131,10 +131,32 @@ jobs:
           lower="$(printf '%s' "$message" | tr '[:upper:]' '[:lower:]')"
 
           skill="digest"
-          if printf '%s' "$lower" | grep -Eq '\b(repo pulse|repo-pulse|github monitor|github-monitor)\b'; then
+          if printf '%s' "$lower" | grep -Eq '\b(code health|code-health|repo health)\b'; then
+            skill="code-health"
+          elif printf '%s' "$lower" | grep -Eq '\b(repo scanner|repo-scanner|scan repo)\b'; then
+            skill="repo-scanner"
+          elif printf '%s' "$lower" | grep -Eq '\b(repo pulse|repo-pulse|github monitor|github-monitor)\b'; then
             skill="repo-pulse"
+          elif printf '%s' "$lower" | grep -Eq '\b(github trending|github-trending|trending repos)\b'; then
+            skill="github-trending"
+          elif printf '%s' "$lower" | grep -Eq '\b(hn digest|hn-digest|hacker news)\b'; then
+            skill="hn-digest"
+          elif printf '%s' "$lower" | grep -Eq '\b(mcp pulse|mcp-pulse)\b'; then
+            skill="mcp-pulse"
+          elif printf '%s' "$lower" | grep -Eq '\b(framework watch|framework-watch|agent framework)\b'; then
+            skill="framework-watch"
           elif printf '%s' "$lower" | grep -Eq '\b(security digest|security-digest|security news|mcp security)\b'; then
             skill="security-digest"
+          elif printf '%s' "$lower" | grep -Eq '\b(priority brief|priority-brief)\b'; then
+            skill="priority-brief"
+          elif printf '%s' "$lower" | grep -Eq '\b(changelog|change log)\b'; then
+            skill="changelog"
+          elif printf '%s' "$lower" | grep -Eq '\b(cost report|cost-report|spend report)\b'; then
+            skill="cost-report"
+          elif printf '%s' "$lower" | grep -Eq '\b(repo actions|repo-actions)\b'; then
+            skill="repo-actions"
+          elif printf '%s' "$lower" | grep -Eq '\b(issue triage|issue-triage|triage issues)\b'; then
+            skill="issue-triage"
           elif printf '%s' "$lower" | grep -Eq '\b(review pr|pr review|comment on pr)\b'; then
             skill="pr-review"
           elif printf '%s' "$lower" | grep -Eq '\b(deploy|prototype|vercel)\b'; then
