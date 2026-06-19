@@ -6,7 +6,7 @@ name: Aeon
       skill:
         description: Skill name
         required: false
-        default: external-feature
+        default: digest
       var:
         description: Skill var
         required: false
@@ -33,7 +33,7 @@ jobs:
         run: echo "mode=skill" >> "$GITHUB_OUTPUT"
 
       - id: skill
-        run: echo "name=${{ inputs.skill || 'external-feature' }}" >> "$GITHUB_OUTPUT"
+        run: echo "name=${{ inputs.skill || 'digest' }}" >> "$GITHUB_OUTPUT"
 
       - name: Charon approval
         if: inputs.charon_approval != ''

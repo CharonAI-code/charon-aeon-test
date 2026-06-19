@@ -89,11 +89,7 @@ jobs:
             review_id="$(printf '%s' "$callback_data" | cut -d: -f3)"
 
             if [ "$decision" = "approve" ] && [ -n "$review_id" ]; then
-              gh workflow run aeon.yml -R "$GITHUB_REPOSITORY" \
-                -f skill=external-feature \
-                -f var="" \
-                -f charon_approval="$review_id"
-              answer="Charon approved. AEON run dispatched."
+              answer="Use webhook mode for Charon approvals; polling mode cannot recover the reviewed skill."
             elif [ "$decision" = "reject" ] && [ -n "$review_id" ]; then
               answer="Charon rejected. No run dispatched."
             elif [ "$decision" = "inspect" ] && [ -n "$review_id" ]; then
@@ -163,8 +159,6 @@ jobs:
             skill="deploy-prototype"
           elif printf '%s' "$lower" | grep -Eq '\b(workflow audit|audit workflow|github actions audit)\b'; then
             skill="workflow-audit"
-          elif printf '%s' "$lower" | grep -Eq '\b(ship|edit|write|commit|change|modify|fix|implement|create file|delete file|remove file)\b'; then
-            skill="external-feature"
           fi
 
           echo "source=$source" >> "$GITHUB_OUTPUT"

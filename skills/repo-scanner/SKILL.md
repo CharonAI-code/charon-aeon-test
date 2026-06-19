@@ -8,11 +8,11 @@ tags: [dev, meta]
 <!-- autoresearch: variation B — sharper output: opportunity taxonomy + fleet Top-5 + priority column + GraphQL bulk fetch -->
 > **${var}** — GitHub username or org to scan. Required — set in aeon.yml var field. Accepts `name`, `@name`, or `https://github.com/name` (normalized to bare login).
 
-Today is ${today}. Catalog all GitHub repos under `${var}` into a structured reference file that downstream skills (`external-feature`, `pr-review`, `code-health`, `repo-pulse`, `vercel-projects`) consume — each repo labelled with a **priority** and a list of **concrete, coded opportunities**, with a fleet-level **Top 5 opportunities** block at the top.
+Today is ${today}. Catalog all GitHub repos under `${var}` into a structured reference file that downstream skills (`pr-review`, `code-health`, `repo-pulse`, `repo-actions`, `vercel-projects`) consume — each repo labelled with a **priority** and a list of **concrete, coded opportunities**, with a fleet-level **Top 5 opportunities** block at the top.
 
 ## Why this shape
 
-`external-feature` is the main reader and needs specific, codeable targets, not free-form TODOs. This skill grounds every opportunity in a fixed taxonomy (`MISSING_CI`, `STALE_PRS:N`, `OPEN_ISSUE_BACKLOG:N`, …) so `external-feature` can pick one and ship a PR the same day. The pre-ranked Top 5 fleet opportunities block removes the ranking burden from every downstream skill.
+Write-capable downstream skills need specific, codeable targets, not free-form TODOs. This skill grounds every opportunity in a fixed taxonomy (`MISSING_CI`, `STALE_PRS:N`, `OPEN_ISSUE_BACKLOG:N`, …) so a later action skill can pick one up without re-ranking the whole fleet. The pre-ranked Top 5 fleet opportunities block removes the ranking burden from every downstream skill.
 
 ## Steps
 
@@ -113,14 +113,14 @@ Today is ${today}. Catalog all GitHub repos under `${var}` into a structured ref
      | `GOOD_FIRST_ISSUES:N` | count from the follow-up query when `N ≥ 1` |
      | `ABANDON_RISK` | category=stale AND `stars ≥ 10` AND pushedAt within last 180d (once-active repo going cold) |
 
-     **Never emit free-form opportunities.** Taxonomy codes are the contract with `external-feature`.
+     **Never emit free-form opportunities.** Taxonomy codes are the contract with downstream action skills.
 
    - **Priority** (derived):
      - `HIGH` — `active` AND `≥2` opportunities, OR `maintained` AND `stars ≥ 20` AND `≥1` opportunity
      - `MED` — `active` AND `1` opportunity, OR `maintained` AND `≥2` opportunities
      - `LOW` — everything else
 
-   - **Agent-repo tag** — if `name` ends with `-aeon` or contains `aeon-agent`, add topic `agent-repo`. These stay in the catalog but are excluded from the fleet Top 5 (they evolve via `autoresearch`, not `external-feature`).
+   - **Agent-repo tag** — if `name` ends with `-aeon` or contains `aeon-agent`, add topic `agent-repo`. These stay in the catalog but are excluded from the fleet Top 5 (they evolve via `autoresearch`, not generic action skills).
 
    - **Change-detection reuse** — if `PRIOR[name].pushedAt == current pushedAt`, reuse the prior `#### name` Details block (copy verbatim from the old `memory/topics/repos.md` under heading match). Keeps diffs meaningful and cuts rewrite churn.
 
@@ -141,7 +141,7 @@ Today is ${today}. Catalog all GitHub repos under `${var}` into a structured ref
    Status: REPO_SCANNER_OK
 
    ## Top 5 fleet opportunities
-   Pre-ranked; each row is a concrete target `external-feature` can pick up directly.
+   Pre-ranked; each row is a concrete target a write-capable action skill can pick up directly.
    | # | Repo | Priority | Opportunity | One-line fix |
    |---|------|----------|-------------|--------------|
    | 1 | [owner/name](url) | HIGH | MISSING_CI | Add `.github/workflows/ci.yml` running `npm test` on push/PR |
@@ -216,9 +216,9 @@ Today is ${today}. Catalog all GitHub repos under `${var}` into a structured ref
 ## Guidelines
 
 - **Skip** archived, template, and empty (`diskUsage=0` or `isEmpty=true`) repos entirely — they waste downstream attention.
-- **Opportunities must be taxonomy codes.** Adding a new code is fine; renaming existing codes breaks `external-feature` consumers.
+- **Opportunities must be taxonomy codes.** Adding a new code is fine; renaming existing codes breaks downstream consumers.
 - **Don't overwrite cross-owner entries in `watched-repos.md`.** Those are hand-curated and may reference orgs outside `${OWNER}`.
-- **Agent repos stay in the catalog** but are excluded from Top 5 fleet opportunities — they evolve via `autoresearch`, not `external-feature`.
+- **Agent repos stay in the catalog** but are excluded from Top 5 fleet opportunities — they evolve via `autoresearch`, not generic action skills.
 - **Change detection** — reuse prior Details blocks for unchanged `pushedAt` to keep diffs meaningful. The Top 5 and tables always regenerate from current data.
 
 ## Sandbox note
@@ -230,7 +230,7 @@ Today is ${today}. Catalog all GitHub repos under `${var}` into a structured ref
 
 ## Output schema (stable)
 
-Downstream consumers (`external-feature`, `pr-review`, `code-health`, `repo-pulse`, `vercel-projects`) grep against `memory/topics/repos.md` for these exact fields. **Do not rename or remove these without a coordinated update** across every consumer skill:
+Downstream consumers (`pr-review`, `code-health`, `repo-pulse`, `repo-actions`, `vercel-projects`) grep against `memory/topics/repos.md` for these exact fields. **Do not rename or remove these without a coordinated update** across every consumer skill:
 
 - Section headings: `## Top 5 fleet opportunities`, `## Active (≤30d)`, `## Maintained (≤90d)`, `## Stale (>90d)`, `## Delta since last scan`, `### Repo Details`
 - Per-repo heading: `#### {name}`

@@ -133,7 +133,7 @@ For every candidate, compute:
 
 **Gate 2 — Novelty.** Compare fuzzy-ish (case-insensitive substring + verb+noun match) against `/tmp/repo-actions-recent-ideas.txt`. If hit → drop.
 
-**Gate 3 — Implementability.** Can `external-feature` execute this autonomously in 1–3 days without human design decisions, external approvals, or architectural debates? Checklist:
+**Gate 3 — Implementability.** Can a write-capable AEON skill execute this autonomously in 1–3 days without human design decisions, external approvals, or architectural debates? Checklist:
 - ✅ Clear inputs/outputs
 - ✅ No new third-party accounts or paid services
 - ✅ No cross-repo coordination
@@ -202,7 +202,7 @@ Structure:
 <!-- Ideas that failed the implementability gate. Surfaced for human decision. Max 3. Omit section entirely if empty. -->
 
 ### A. [Title]
-**Why not yet:** [What decision / approval / external thing blocks external-feature from doing this autonomously]
+**Why not yet:** [What decision / approval / external thing blocks a write-capable AEON skill from doing this autonomously]
 **Anchor:** [...]
 
 ## Fleet follow-ons

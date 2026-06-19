@@ -59,8 +59,8 @@ main() {
 
   run_case \
     "PAUSE" \
-    "external-feature" \
-    "Ship a small file edit and commit it." \
+    "repo-actions" \
+    "Run repo-actions and prepare a write-capable repo action plan." \
     125 \
     "write-capable skill is paused before launch"
 

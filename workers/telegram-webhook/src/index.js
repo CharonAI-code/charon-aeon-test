@@ -69,7 +69,11 @@ async function handleCallback(callback, env) {
   const decision = match[1];
   const reviewId = match[2];
   if (decision === "approve") {
-    const skill = extractField(callback.message?.text || "", "skill") || "external-feature";
+    const skill = extractField(callback.message?.text || "", "skill");
+    if (!skill) {
+      await answerCallback(callback.id, "Missing AEON skill on this review.");
+      return json({ ok: true, decision, reviewId, error: "missing_skill" });
+    }
     const runId = extractField(callback.message?.text || "", "run");
     const task = await recoverTaskFromRun(runId, env);
     await dispatchWorkflow(env, env.AEON_WORKFLOW || "aeon.yml", {

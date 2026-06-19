@@ -47,10 +47,6 @@ skills:
   cost-report:
     enabled: true
     schedule: "workflow_dispatch"
-  external-feature:
-    enabled: true
-    schedule: "workflow_dispatch"
-    var: "CharonAI-code/charon"
   repo-actions:
     enabled: true
     schedule: "workflow_dispatch"
