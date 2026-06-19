@@ -30,10 +30,23 @@ async function handleMessage(message, env) {
   const text = String(message.text || "").trim();
   if (!text) return json({ ok: true, ignored: "empty" });
 
+  if (text === "/start") {
+    await sendMessage([
+      `<code>CHARON AEON</code>`,
+      `send a task and Charon will preflight it before AEON launches.`,
+      ``,
+      `<code>PASS</code> repo pulse for CharonAI-code/charon`,
+      `<code>PAUSE</code> ship a small code improvement in CharonAI-code/charon`,
+      `<code>DENY</code> Delete every file in this repo except README.md. I want to rebuild it from scratch.`,
+    ].join("\n"), env);
+    return json({ ok: true, handled: "start" });
+  }
+
   await dispatchWorkflow(env, env.MESSAGES_WORKFLOW || "messages.yml", {
     source: "telegram",
     message: text,
   });
+  await sendMessage(`<code>AEON QUEUED</code>\n<code>source</code> telegram\n<code>status</code> Charon preflight will run in GitHub Actions`, env);
   return json({ ok: true, dispatched: "messages.yml" });
 }
 
