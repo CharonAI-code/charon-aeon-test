@@ -211,8 +211,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$verdict" = "PAUSE" ]; then
-            npx -y github:CharonAI-code/charon aeon telegram send latest
-            exit "$status"
+            echo "Paused by Charon; generating read-only AEON plan before asking for approval."
+            exit 0
           fi
 
           if [ "$verdict" = "DENY" ]; then
@@ -221,6 +221,122 @@ jobs:
           fi
 
           cat charon-preflight.json | jq '{verdict, reason, ruleId, launched, reviewId}'
+
+      - name: Generate PAUSE plan
+        if: steps.charon.outputs.verdict == 'PAUSE'
+        env:
+          MESSAGE: ${{ steps.msg.outputs.message }}
+          SKILL_NAME: ${{ steps.msg.outputs.skill }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_BASE_URL: ${{ vars.ANTHROPIC_BASE_URL }}
+          BANKR_LLM_KEY: ${{ secrets.BANKR_LLM_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          USEPOD_TOKEN: ${{ secrets.USEPOD_TOKEN }}
+          VENICE_API_KEY: ${{ secrets.VENICE_API_KEY }}
+          SURPLUS_API_KEY: ${{ secrets.SURPLUS_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+          OPENROUTER_MODEL_SONNET: ${{ vars.OPENROUTER_MODEL_SONNET }}
+          OPENROUTER_MODEL_HAIKU: ${{ vars.OPENROUTER_MODEL_HAIKU }}
+          USEPOD_MODEL: ${{ vars.USEPOD_MODEL }}
+          USEPOD_MODEL_SONNET: ${{ vars.USEPOD_MODEL_SONNET }}
+          USEPOD_MODEL_HAIKU: ${{ vars.USEPOD_MODEL_HAIKU }}
+          VENICE_MODEL: ${{ vars.VENICE_MODEL }}
+          VENICE_BASE_URL: ${{ vars.VENICE_BASE_URL }}
+          VENICE_CLEANCACHE: ${{ vars.VENICE_CLEANCACHE }}
+          SURPLUS_MODEL: ${{ vars.SURPLUS_MODEL }}
+          CCR_LOG: ${{ vars.CCR_LOG }}
+        run: |
+          set -euo pipefail
+          if ! command -v claude >/dev/null 2>&1; then
+            npm install -g @anthropic-ai/claude-code@2.1.168 >/dev/null
+          fi
+
+          CONFIG_MODEL="$(grep -E '^model:' aeon.yml | sed 's/^model: *//' | tr -d ' \"')"
+          MODEL="${CONFIG_MODEL:-claude-opus-4-8}"
+          GW="${GITHUB_WORKSPACE}/scripts/llm-gateway.sh"
+          GATEWAY=$(grep -A1 '^gateway:' aeon.yml | grep 'provider:' | sed 's/.*provider:[[:space:]]*//' | sed "s/[\"' ]//g" || true)
+          GATEWAY="${GATEWAY:-auto}"
+          if [ "$GATEWAY" = "auto" ]; then
+            CANDIDATES=$(AEON_LIST_CANDIDATES=1 bash "$GW")
+          else
+            CANDIDATES="$GATEWAY"
+          fi
+
+          node <<'NODE' > pause-prompt.txt
+          const skill = process.env.SKILL_NAME || "unknown";
+          const message = process.env.MESSAGE || "";
+          process.stdout.write(`Charon paused this AEON task before side effects.
+
+          Skill: ${skill}
+          User request:
+          ${message}
+
+          Produce a short approval plan for the user.
+          Do not execute the task.
+          Do not edit files.
+          Do not run git writes.
+          Do not call external write APIs.
+
+          Output only:
+          1. what you would do
+          2. files/systems likely touched
+          3. risk level
+          4. what approval means
+          `);
+          NODE
+          prompt="$(cat pause-prompt.txt)"
+
+          ALLOWED="Read,Glob,Grep,WebFetch,WebSearch"
+          CLAUDE_OK=0
+          for cand in $CANDIDATES; do
+            echo "::notice::Plan routing attempt via '$cand'"
+            if PLAN_JSON=$(
+              GATEWAY="$cand"
+              source "$GW" >&2
+              echo "$prompt" | claude -p - --model "$MODEL" --allowedTools "$ALLOWED" --output-format json 2>&1
+            ); then
+              CLAUDE_OK=1
+              break
+            fi
+            echo "::warning::plan provider '$cand' failed - $(printf '%s' "$PLAN_JSON" | tail -c 160 | tr '\n' ' ')"
+          done
+          if [ "$CLAUDE_OK" = "1" ]; then
+            echo "$PLAN_JSON" | jq -r '.result // empty' > pause-plan.txt
+          else
+            echo "Plan unavailable. Charon still paused this task because it can perform approval-worthy side effects." > pause-plan.txt
+          fi
+          {
+            echo "### Proposed plan"
+            echo ""
+            cat pause-plan.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Send PAUSE review with plan
+        if: steps.charon.outputs.verdict == 'PAUSE'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          npx -y github:CharonAI-code/charon aeon telegram payload latest --chat-id "$TELEGRAM_CHAT_ID" > charon-telegram.json
+          node <<'NODE'
+          const fs = require("fs");
+          const payload = JSON.parse(fs.readFileSync("charon-telegram.json", "utf8"));
+          const plan = fs.readFileSync("pause-plan.txt", "utf8").trim() || "Plan unavailable.";
+          const escapeHtml = (value) => String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+          const clipped = plan.length > 1800 ? `${plan.slice(0, 1800)}\n...` : plan;
+          const planBlock = `\n\n<code>proposed plan</code>\n${escapeHtml(clipped)}`;
+          payload.text = String(payload.text || "").replace("</blockquote>", `${planBlock}</blockquote>`);
+          fs.writeFileSync("charon-telegram-with-plan.json", JSON.stringify(payload));
+          NODE
+          curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            --data-binary @charon-telegram-with-plan.json >/dev/null
+          exit "${{ steps.charon.outputs.status }}"
 
       - name: Run AEON message
         if: steps.charon.outputs.verdict == 'PASS'
