@@ -11,6 +11,10 @@ name: Aeon
         description: Skill var
         required: false
         default: ""
+      model:
+        description: Model override
+        required: false
+        default: ""
       charon_approval:
         description: Charon approval id
         required: false
@@ -95,12 +99,24 @@ jobs:
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.BANKR_API_KEY || secrets.BANKR_LLM_KEY }}
           ANTHROPIC_MODEL: deepseek-v4-pro
           CLAUDE_CODE_MODEL: deepseek-v4-pro
+          INPUT_MODEL: ${{ inputs.model }}
+          SKILL_NAME: ${{ steps.skill.outputs.name }}
         run: |
           if ! command -v claude >/dev/null 2>&1; then
             npm install -g @anthropic-ai/claude-code >/dev/null
           fi
+          CONFIG_MODEL="$(grep -E '^model:' aeon.yml | sed 's/^model: *//' | tr -d ' \"')"
+          SKILL_MODEL="$(grep "^  ${SKILL_NAME}:" aeon.yml | sed -n 's/.*model: *\"\([^\"]*\)\".*/\1/p')"
+          if [ -n "$INPUT_MODEL" ]; then
+            MODEL="$INPUT_MODEL"
+          elif [ -n "$SKILL_MODEL" ]; then
+            MODEL="$SKILL_MODEL"
+          else
+            MODEL="${CONFIG_MODEL:-deepseek-v4-pro}"
+          fi
+          echo "Using model: $MODEL"
           ALLOWED="Bash(git:*),Write,Edit"
-          claude -p "run aeon skill" --allowedTools "$ALLOWED"
+          claude -p "run aeon skill" --model "$MODEL" --allowedTools "$ALLOWED"
 
       - name: Notify AEON failure
         if: failure()

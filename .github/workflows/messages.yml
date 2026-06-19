@@ -219,11 +219,16 @@ jobs:
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.BANKR_API_KEY || secrets.BANKR_LLM_KEY }}
           ANTHROPIC_MODEL: deepseek-v4-pro
           CLAUDE_CODE_MODEL: deepseek-v4-pro
+          SKILL_NAME: ${{ steps.msg.outputs.skill }}
         run: |
           set -euo pipefail
           if ! command -v claude >/dev/null 2>&1; then
             npm install -g @anthropic-ai/claude-code >/dev/null
           fi
+          CONFIG_MODEL="$(grep -E '^model:' aeon.yml | sed 's/^model: *//' | tr -d ' \"')"
+          SKILL_MODEL="$(grep "^  ${SKILL_NAME}:" aeon.yml | sed -n 's/.*model: *\"\([^\"]*\)\".*/\1/p')"
+          MODEL="${SKILL_MODEL:-${CONFIG_MODEL:-deepseek-v4-pro}}"
+          echo "Using model: $MODEL"
 
           cat > ./notify <<'NOTIFY'
           #!/usr/bin/env bash
@@ -240,4 +245,4 @@ jobs:
 
           prompt="$(printf 'You received this AEON Telegram message from %s:\n\n%s\n\nUse the local skills/ folder when relevant. Reply through ./notify. Keep it short.' "$SOURCE" "$MESSAGE")"
           ALLOWED="Read,Glob,Grep,WebFetch,WebSearch,Bash(./notify:*),Bash(gh:*),Bash(curl:*),Bash(jq:*),Bash(find:*),Bash(grep:*),Bash(cat:*),Bash(ls:*),Bash(date:*)"
-          echo "$prompt" | claude -p - --allowedTools "$ALLOWED"
+          echo "$prompt" | claude -p - --model "$MODEL" --allowedTools "$ALLOWED"
