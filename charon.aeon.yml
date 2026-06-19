@@ -18,6 +18,10 @@ bounds:
       verdict: DENY
       role: unknown
       includes: aeon.intent:secret-exfil
+    - id: aeon.secret_url_exfil.deny
+      verdict: DENY
+      role: fetch-url
+      includes: aeon.intent:secret-exfil
     - id: aeon.webhook_exfil.deny
       verdict: DENY
       role: fetch-url
