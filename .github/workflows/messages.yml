@@ -328,9 +328,9 @@ jobs:
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
-          const clipped = plan.length > 1800 ? `${plan.slice(0, 1800)}\n...` : plan;
-          const planBlock = `\n\n<code>proposed plan</code>\n${escapeHtml(clipped)}`;
-          payload.text = String(payload.text || "").replace("</blockquote>", `${planBlock}</blockquote>`);
+          const clipped = plan.length > 2600 ? `${plan.slice(0, 2600)}\n...` : plan;
+          const planBlock = `\n\n<b>Proposed plan</b>\n${escapeHtml(clipped)}`;
+          payload.text = `${String(payload.text || "")}${planBlock}`;
           fs.writeFileSync("charon-telegram-with-plan.json", JSON.stringify(payload));
           NODE
           curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
