@@ -5,7 +5,8 @@ bounds:
   pause: []
   deny: []
   rules:
-    - id: aeon.intent_secret_exfil.deny
+    # DENY: high-confidence no-go side effects.
+    - id: aeon.secret_exfil.deny
       verdict: DENY
       role: unknown
       includes: aeon.intent:secret-exfil
@@ -21,14 +22,12 @@ bounds:
       verdict: DENY
       role: fetch-url
       includes: ngrok
-    - id: aeon.intent_delete.deny
+    - id: aeon.repo_wipe.deny
       verdict: DENY
       role: delete-path
       includes: "."
-    - id: aeon.workflow_write.pause
-      verdict: PAUSE
-      role: write-path
-      includes: ''
+
+    # PAUSE: legitimate but approval-worthy AEON skills.
     - id: aeon.pr_review.pause
       verdict: PAUSE
       role: mcp-tool
@@ -53,7 +52,10 @@ bounds:
       verdict: PAUSE
       role: mcp-tool
       includes: aeon.skill:vigil-revoke
-    - id: aeon.workflow_edit.deny
-      verdict: DENY
+
+    # Workflow/security audits are allowed to inspect, but they should not run as
+    # an unsupervised write path from Telegram.
+    - id: aeon.workflow_audit.pause
+      verdict: PAUSE
       role: mcp-tool
       includes: aeon.skill:workflow-audit
