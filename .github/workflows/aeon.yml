@@ -159,6 +159,12 @@ jobs:
           chmod +x ./notify
 
           ALLOWED="Bash(git:*),Bash(./notify:*),Write,Edit"
+          case "$SKILL_NAME" in
+            digest|security-digest|hn-digest|github-trending|framework-watch|mcp-pulse)
+              ALLOWED="$ALLOWED,WebSearch,WebFetch"
+              ;;
+          esac
+          echo "Allowed tools: $ALLOWED"
           prompt="$(printf 'Run AEON skill: %s\n\nTask:\n%s\n\nWhen finished, send the user a concise result through ./notify. Include what changed or what happened. Do not only say complete.' "$SKILL_NAME" "$SKILL_VAR")"
           CLAUDE_OK=0
           USED_GATEWAY=""
