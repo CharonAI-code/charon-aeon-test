@@ -68,3 +68,9 @@ skills:
     enabled: true
     schedule: "workflow_dispatch"
     var: "CharonAI-code/charon"
+  charon-setup:
+    enabled: true
+    schedule: "workflow_dispatch"
+  charon-policy:
+    enabled: true
+    schedule: "workflow_dispatch"

@@ -5,6 +5,14 @@ bounds:
   pause: []
   deny: []
   rules:
+    # Charon policy edits are approval-gated before generic intent detectors run.
+    # This lets hardening requests mention dangerous patterns without becoming
+    # impossible to review.
+    - id: aeon.charon_policy.pause
+      verdict: PAUSE
+      role: mcp-tool
+      includes: aeon.skill:charon-policy
+
     # DENY: high-confidence no-go side effects.
     - id: aeon.secret_exfil.deny
       verdict: DENY

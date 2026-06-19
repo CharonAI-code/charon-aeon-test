@@ -127,7 +127,11 @@ jobs:
           lower="$(printf '%s' "$message" | tr '[:upper:]' '[:lower:]')"
 
           skill="digest"
-          if printf '%s' "$lower" | grep -Eq '\b(code health|code-health|repo health)\b'; then
+          if printf '%s' "$lower" | grep -Eq '\b(charon policy|charon-policy|policy skill|change the policy|edit the policy|test policy|explain the current policy)\b'; then
+            skill="charon-policy"
+          elif printf '%s' "$lower" | grep -Eq '\b(charon setup|charon-setup|enable charon|install charon|setup charon)\b'; then
+            skill="charon-setup"
+          elif printf '%s' "$lower" | grep -Eq '\b(code health|code-health|repo health)\b'; then
             skill="code-health"
           elif printf '%s' "$lower" | grep -Eq '\b(repo scanner|repo-scanner|scan repo)\b'; then
             skill="repo-scanner"

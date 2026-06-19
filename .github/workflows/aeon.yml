@@ -163,9 +163,27 @@ jobs:
             digest|security-digest|hn-digest|github-trending|framework-watch|mcp-pulse)
               ALLOWED="$ALLOWED,WebSearch,WebFetch"
               ;;
+            charon-policy)
+              ALLOWED="$ALLOWED,Bash(node:*)"
+              ;;
+            charon-setup)
+              ALLOWED="$ALLOWED,Bash(bash:*),Bash(node:*),Bash(npx:*)"
+              ;;
           esac
           echo "Allowed tools: $ALLOWED"
-          prompt="$(printf 'Run AEON skill: %s\n\nTask:\n%s\n\nWhen finished, send the user a concise result through ./notify. Include what changed or what happened. Do not only say complete.' "$SKILL_NAME" "$SKILL_VAR")"
+          SKILL_FILE=""
+          for candidate in "skills/${SKILL_NAME}/SKILL.md" "skills/aeon/${SKILL_NAME}/SKILL.md"; do
+            if [ -f "$candidate" ]; then
+              SKILL_FILE="$candidate"
+              break
+            fi
+          done
+          if [ -z "$SKILL_FILE" ]; then
+            echo "::error::Skill file not found for ${SKILL_NAME}"
+            exit 1
+          fi
+          SKILL_DOC="$(cat "$SKILL_FILE")"
+          prompt="$(printf 'Run AEON skill: %s\n\nSkill instructions:\n%s\n\nTask:\n%s\n\nWhen finished, send the user a concise result through ./notify. Include what changed or what happened. Do not only say complete.' "$SKILL_NAME" "$SKILL_DOC" "$SKILL_VAR")"
           CLAUDE_OK=0
           USED_GATEWAY=""
           for cand in $CANDIDATES; do
