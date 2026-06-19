@@ -181,8 +181,10 @@ function allowedChat(chatId, env) {
 }
 
 function extractField(text, key) {
-  const pattern = new RegExp(`<code>${escapeRegExp(key)}</code>\\s*([^\\n]+)`, "i");
-  const match = String(text || "").match(pattern);
+  const source = String(text || "");
+  const htmlPattern = new RegExp(`<code>${escapeRegExp(key)}</code>\\s*([^\\n]+)`, "i");
+  const plainPattern = new RegExp(`(?:^|\\n)${escapeRegExp(key)}\\s+([^\\n]+)`, "i");
+  const match = source.match(htmlPattern) || source.match(plainPattern);
   return match ? unescapeHtml(match[1].trim()) : "";
 }
 
