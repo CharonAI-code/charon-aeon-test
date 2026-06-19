@@ -87,6 +87,7 @@ jobs:
         run: echo "prefetch"
 
       - name: Run
+        id: aeon_run
         env:
           BANKR_LLM_KEY: ${{ secrets.BANKR_LLM_KEY }}
           ANTHROPIC_BASE_URL: https://llm.bankr.bot
@@ -97,3 +98,19 @@ jobs:
           fi
           ALLOWED="Bash(git:*),Write,Edit"
           claude -p "run aeon skill" --allowedTools "$ALLOWED"
+
+      - name: Notify AEON failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            exit 0
+          fi
+          text="$(printf '<code>AEON FAILED</code>\n<code>run</code> %s\n<code>url</code> %s' "$GITHUB_RUN_ID" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"
+          curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${text}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true" >/dev/null || true
