@@ -211,11 +211,14 @@ jobs:
         env:
           MESSAGE: ${{ steps.msg.outputs.message }}
           SOURCE: ${{ steps.msg.outputs.source }}
+          BANKR_API_KEY: ${{ secrets.BANKR_API_KEY || secrets.BANKR_LLM_KEY }}
           BANKR_LLM_KEY: ${{ secrets.BANKR_LLM_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ANTHROPIC_BASE_URL: https://llm.bankr.bot
-          ANTHROPIC_AUTH_TOKEN: ${{ secrets.BANKR_LLM_KEY }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.BANKR_API_KEY || secrets.BANKR_LLM_KEY }}
+          ANTHROPIC_MODEL: deepseek-v4-pro
+          CLAUDE_CODE_MODEL: deepseek-v4-pro
         run: |
           set -euo pipefail
           if ! command -v claude >/dev/null 2>&1; then
