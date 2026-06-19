@@ -83,9 +83,11 @@ async function handleCallback(callback, env) {
   const reviewId = match[2];
   if (decision === "approve") {
     const skill = extractField(callback.message?.text || "", "skill") || "external-feature";
+    const runId = extractField(callback.message?.text || "", "run");
+    const task = await recoverTaskFromRun(runId, env);
     await dispatchWorkflow(env, env.AEON_WORKFLOW || "aeon.yml", {
       skill,
-      var: "",
+      var: task,
       charon_approval: reviewId,
     });
     await answerCallback(callback.id, "Charon approved. AEON run dispatched.", env);
@@ -101,6 +103,25 @@ async function handleCallback(callback, env) {
 
   await answerCallback(callback.id, `Review: ${reviewId}`, env);
   return json({ ok: true, decision, reviewId });
+}
+
+async function recoverTaskFromRun(runId, env) {
+  if (!runId || !/^\d+$/.test(String(runId))) return "";
+  const repo = required(env.GITHUB_REPO, "GITHUB_REPO");
+  const token = required(env.GITHUB_TOKEN, "GITHUB_TOKEN");
+  const response = await fetch(`${GITHUB_API}/repos/${repo}/actions/runs/${runId}`, {
+    headers: {
+      "authorization": `Bearer ${token}`,
+      "accept": "application/vnd.github+json",
+      "user-agent": "charon-aeon-telegram-worker",
+      "x-github-api-version": "2022-11-28",
+    },
+  });
+  if (!response.ok) return "";
+  const run = await response.json();
+  const title = String(run.display_title || run.name || "");
+  const match = title.match(/^msg \([^)]+\):\s*([\s\S]+)$/);
+  return match ? match[1].trim() : "";
 }
 
 async function dispatchWorkflow(env, workflow, inputs) {

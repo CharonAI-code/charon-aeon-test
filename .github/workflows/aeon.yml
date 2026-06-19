@@ -101,6 +101,7 @@ jobs:
           CLAUDE_CODE_MODEL: deepseek-v4-pro
           INPUT_MODEL: ${{ inputs.model }}
           SKILL_NAME: ${{ steps.skill.outputs.name }}
+          SKILL_VAR: ${{ inputs.var }}
         run: |
           if ! command -v claude >/dev/null 2>&1; then
             npm install -g @anthropic-ai/claude-code >/dev/null
@@ -116,7 +117,24 @@ jobs:
           fi
           echo "Using model: $MODEL"
           ALLOWED="Bash(git:*),Write,Edit"
-          claude -p "run aeon skill" --model "$MODEL" --allowedTools "$ALLOWED"
+          prompt="$(printf 'Run AEON skill: %s\n\nTask:\n%s\n\nIf you complete the task, summarize the result clearly.' "$SKILL_NAME" "$SKILL_VAR")"
+          claude -p "$prompt" --model "$MODEL" --allowedTools "$ALLOWED"
+
+      - name: Notify AEON success
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            exit 0
+          fi
+          text="$(printf '<code>AEON COMPLETE</code>\n<code>run</code> %s\n<code>url</code> %s' "$GITHUB_RUN_ID" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"
+          curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${text}" \
+            -d "parse_mode=HTML" \
+            -d "disable_web_page_preview=true" >/dev/null || true
 
       - name: Notify AEON failure
         if: failure()
